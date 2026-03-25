@@ -142,18 +142,15 @@
 
 <script>
     // 1. ADD YOUR FIREBASE CONFIGURATION HERE
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "your-project.firebaseapp.com",
-        databaseURL: "YOUR_DATABASE_URL",
-        projectId: "your-project",
-        storageBucket: "your-project.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        const firebaseConfig = {
+    apiKey: "AIzaSyBCutkIsHV41yg4G4fCb6QEDEIQHTbETj0",
+    authDomain: "algotrade-5da97.firebaseapp.com",
+    projectId: "algotrade-5da97",
+    storageBucket: "algotrade-5da97.firebasestorage.app",
+    messagingSenderId: "799962877805",
+    appId: "1:799962877805:web:b6a413cd613f9b12355464",
+    measurementId: "G-Z9W8PN6QZD"
     };
-
-    // THE OWNER EMAIL (Change this to your exact Gmail address)
-    const OWNER_EMAIL = "YOUR_EMAIL@gmail.com";
 
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -191,13 +188,6 @@
     // AUTH STATE OBSERVER (With Security Check)
     auth.onAuthStateChanged(user => {
         if (user) {
-            // SECURITY CHECK: Is this exactly your email?
-            if (user.email !== OWNER_EMAIL) {
-                logout();
-                showError("Unauthorized Account: Access Denied.");
-                return;
-            }
-
             // User is signed in AND authorized
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('dashboardScreen').style.display = 'block';
