@@ -35,9 +35,27 @@
         .btn {
             width: 100%; padding: 12px; border: none; border-radius: 6px;
             background-color: var(--primary); color: white; font-weight: bold;
-            cursor: pointer; transition: 0.2s;
+            cursor: pointer; transition: 0.2s; margin-bottom: 10px;
         }
         .btn:hover { background-color: #5c6bc0; }
+        
+        /* Google Button Style */
+        .btn-google {
+            background-color: white; color: #757575; border: 1px solid #ddd;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-google:hover { background-color: #f1f1f1; }
+        .btn-google img { width: 18px; height: 18px; }
+
+        .divider {
+            display: flex; align-items: center; text-align: center; margin: 15px 0; color: var(--text-muted); font-size: 12px;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; border-bottom: 1px solid var(--border);
+        }
+        .divider:not(:empty)::before { margin-right: .25em; }
+        .divider:not(:empty)::after { margin-left: .25em; }
+
         #loginError { color: var(--loss); font-size: 13px; margin-top: 10px; display: none; }
 
         /* DASHBOARD STYLES */
@@ -71,9 +89,18 @@
     <div id="loginScreen">
         <div class="login-box">
             <h2 style="margin-top: 0;">Bot Access</h2>
+            
+            <button class="btn btn-google" onclick="loginWithGoogle()">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google logo">
+                Sign in with Google
+            </button>
+            
+            <div class="divider">OR</div>
+
             <input type="email" id="emailInput" class="login-input" placeholder="Email">
             <input type="password" id="passwordInput" class="login-input" placeholder="Password">
-            <button class="btn" onclick="login()">Sign In</button>
+            <button class="btn" onclick="loginWithEmail()">Sign In</button>
+            
             <div id="loginError">Invalid credentials.</div>
         </div>
     </div>
@@ -125,33 +152,58 @@
         appId: "YOUR_APP_ID"
     };
 
+    // THE OWNER EMAIL (Change this to your exact Gmail address)
+    const OWNER_EMAIL = "YOUR_EMAIL@gmail.com";
+
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
     let dbListener = null;
 
-    // LOGIN LOGIC
-    function login() {
+    // LOGIN WITH GOOGLE
+    function loginWithGoogle() {
+        document.getElementById('loginError').style.display = 'none';
+        auth.signInWithPopup(googleProvider).catch(error => { 
+            showError(error.message); 
+        });
+    }
+
+    // LOGIN WITH EMAIL
+    function loginWithEmail() {
         const email = document.getElementById('emailInput').value;
         const pass = document.getElementById('passwordInput').value;
         document.getElementById('loginError').style.display = 'none';
         
-        auth.signInWithEmailAndPassword(email, pass)
-            .catch(error => { document.getElementById('loginError').style.display = 'block'; });
+        auth.signInWithEmailAndPassword(email, pass).catch(error => { 
+            showError("Invalid email or password."); 
+        });
+    }
+
+    function showError(msg) {
+        document.getElementById('loginError').innerText = msg;
+        document.getElementById('loginError').style.display = 'block';
     }
 
     // LOGOUT LOGIC
     function logout() { auth.signOut(); }
 
-    // AUTH STATE OBSERVER
+    // AUTH STATE OBSERVER (With Security Check)
     auth.onAuthStateChanged(user => {
         if (user) {
-            // User is signed in -> Show Dashboard & Attach Listener
+            // SECURITY CHECK: Is this exactly your email?
+            if (user.email !== OWNER_EMAIL) {
+                logout();
+                showError("Unauthorized Account: Access Denied.");
+                return;
+            }
+
+            // User is signed in AND authorized
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('dashboardScreen').style.display = 'block';
             startDatabaseListener();
         } else {
-            // User is signed out -> Show Login & Detach Listener
+            // User is signed out
             document.getElementById('loginScreen').style.display = 'flex';
             document.getElementById('dashboardScreen').style.display = 'none';
             if (dbListener) db.ref('dashboard').off('value', dbListener);
@@ -208,6 +260,8 @@
                 `;
                 container.appendChild(card);
             });
+        }, (error) => {
+            console.error("Firebase read error (likely unauthorized):", error);
         });
     }
 </script>
