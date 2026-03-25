@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Algo Trading Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #121212; --card-bg: #1e1e1e; --text-main: #ffffff;
+            --text-muted: #a0a0a0; --profit: #00e676; --loss: #ff5252;
+            --border: #333333; --primary: #3f51b5;
+        }
+        
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color); color: var(--text-main);
+            margin: 0; padding: 16px; -webkit-font-smoothing: antialiased;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* LOGIN SCREEN STYLES */
+        #loginScreen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 80vh; text-align: center;
+        }
+        .login-box {
+            background-color: var(--card-bg); padding: 30px; border-radius: 12px;
+            border: 1px solid var(--border); width: 100%; max-width: 350px;
+        }
+        .login-input {
+            width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 6px;
+            border: 1px solid var(--border); background-color: #2a2a2a; color: white;
+        }
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 6px;
+            background-color: var(--primary); color: white; font-weight: bold;
+            cursor: pointer; transition: 0.2s;
+        }
+        .btn:hover { background-color: #5c6bc0; }
+        #loginError { color: var(--loss); font-size: 13px; margin-top: 10px; display: none; }
+
+        /* DASHBOARD STYLES */
+        #dashboardScreen { display: none; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        .status-badge { background-color: #555; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
+        .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        .summary-card { background-color: var(--card-bg); border-radius: 12px; padding: 24px 20px; text-align: center; margin-bottom: 24px; border: 1px solid var(--border); }
+        .pnl-value { font-size: 42px; font-weight: 800; margin: 12px 0; }
+        .positive { color: var(--profit); } .negative { color: var(--loss); } .neutral { color: var(--text-main); }
+        .stats-row { display: flex; justify-content: space-around; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+        .stat-item { display: flex; flex-direction: column; gap: 4px; }
+        .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
+        .stat-val { font-size: 16px; font-weight: 600; }
+        .positions-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .positions-title { font-size: 16px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+        .position-card { background-color: var(--card-bg); border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--border); }
+        .position-card.long { border-left-color: var(--profit); } .position-card.short { border-left-color: var(--loss); }
+        .pos-left { display: flex; flex-direction: column; gap: 6px; } .pos-right { display: flex; flex-direction: column; gap: 6px; text-align: right; }
+        .pos-symbol { font-size: 18px; font-weight: 700; }
+        .side-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; background: rgba(255,255,255,0.1); }
+        .pos-details { font-size: 13px; color: var(--text-muted); }
+        .target-text { font-size: 13px; font-weight: 600; } .tp-text { color: var(--profit); } .sl-text { color: var(--loss); }
+        .last-updated { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 32px; padding-bottom: 20px; }
+        .empty-state { text-align: center; padding: 30px; color: var(--text-muted); background-color: var(--card-bg); border-radius: 10px; border: 1px dashed var(--border); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="loginScreen">
+        <div class="login-box">
+            <h2 style="margin-top: 0;">Bot Access</h2>
+            <input type="email" id="emailInput" class="login-input" placeholder="Email">
+            <input type="password" id="passwordInput" class="login-input" placeholder="Password">
+            <button class="btn" onclick="login()">Sign In</button>
+            <div id="loginError">Invalid credentials.</div>
+        </div>
+    </div>
+
+    <div id="dashboardScreen">
+        <div class="header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 style="margin: 0;">Dashboard</h2>
+                <span id="botMode" class="status-badge">CONNECTING</span>
+            </div>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+
+        <div class="summary-card">
+            <div style="color: var(--text-muted); font-size: 14px; font-weight: 600; text-transform: uppercase;">Net Daily PnL</div>
+            <div id="dailyPnl" class="pnl-value neutral">₹0.00</div>
+            <div class="stats-row">
+                <div class="stat-item"><span class="stat-label">Trades</span><span class="stat-val" id="tradesCount">0</span></div>
+                <div class="stat-item"><span class="stat-label">Status</span><span class="stat-val" id="marketStatus">Monitoring</span></div>
+            </div>
+        </div>
+
+        <div class="positions-header">
+            <span class="positions-title">Active Positions</span>
+            <span class="status-badge" style="background: transparent; border: 1px solid var(--border);"><span id="activeCount">0</span> Open</span>
+        </div>
+        
+        <div id="positionsContainer">
+            <div class="empty-state">Waiting for database sync...</div>
+        </div>
+        
+        <div id="lastUpdated" class="last-updated">Connecting...</div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+    // 1. ADD YOUR FIREBASE CONFIGURATION HERE
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "your-project.firebaseapp.com",
+        databaseURL: "YOUR_DATABASE_URL",
+        projectId: "your-project",
+        storageBucket: "your-project.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
+    let dbListener = null;
+
+    // LOGIN LOGIC
+    function login() {
+        const email = document.getElementById('emailInput').value;
+        const pass = document.getElementById('passwordInput').value;
+        document.getElementById('loginError').style.display = 'none';
+        
+        auth.signInWithEmailAndPassword(email, pass)
+            .catch(error => { document.getElementById('loginError').style.display = 'block'; });
+    }
+
+    // LOGOUT LOGIC
+    function logout() { auth.signOut(); }
+
+    // AUTH STATE OBSERVER
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            // User is signed in -> Show Dashboard & Attach Listener
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('dashboardScreen').style.display = 'block';
+            startDatabaseListener();
+        } else {
+            // User is signed out -> Show Login & Detach Listener
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('dashboardScreen').style.display = 'none';
+            if (dbListener) db.ref('dashboard').off('value', dbListener);
+        }
+    });
+
+    // DATABASE LISTENER
+    function startDatabaseListener() {
+        dbListener = db.ref('dashboard').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (!data) return;
+
+            if (data.summary) {
+                const modeBadge = document.getElementById('botMode');
+                modeBadge.innerText = data.summary.mode;
+                modeBadge.style.backgroundColor = data.summary.mode === "LIVE_TRADE" ? "#ff5252" : "#3f51b5";
+                
+                const pnlValue = parseFloat(data.summary.daily_pnl);
+                const pnlElement = document.getElementById('dailyPnl');
+                pnlElement.innerText = `₹${pnlValue.toFixed(2)}`;
+                pnlElement.className = `pnl-value ${pnlValue > 0 ? 'positive' : pnlValue < 0 ? 'negative' : 'neutral'}`;
+                
+                document.getElementById('tradesCount').innerText = data.summary.trades_executed;
+                document.getElementById('lastUpdated').innerText = `Last Python sync: ${data.summary.last_updated} IST`;
+            }
+
+            const container = document.getElementById('positionsContainer');
+            container.innerHTML = ''; 
+            
+            const positions = data.active_positions || {};
+            const symbols = Object.keys(positions);
+            document.getElementById('activeCount').innerText = symbols.length;
+
+            if (symbols.length === 0) {
+                container.innerHTML = '<div class="empty-state">No active trades currently open.</div>';
+                return;
+            }
+
+            symbols.forEach(symbol => {
+                const pos = positions[symbol];
+                const cleanSymbol = symbol.replace('.NS', ''); 
+                const card = document.createElement('div');
+                card.className = `position-card ${pos.side}`; 
+                
+                card.innerHTML = `
+                    <div class="pos-left">
+                        <div class="pos-symbol">${cleanSymbol} <span class="side-badge">${pos.side}</span></div>
+                        <div class="pos-details">Entry: ₹${pos.entry_price.toFixed(2)} &nbsp;|&nbsp; Qty: ${pos.qty}</div>
+                    </div>
+                    <div class="pos-right">
+                        <div class="target-text tp-text">TP: ₹${pos.tp.toFixed(2)}</div>
+                        <div class="target-text sl-text">SL: ₹${pos.sl.toFixed(2)}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        });
+    }
+</script>
+</body>
+</html>
