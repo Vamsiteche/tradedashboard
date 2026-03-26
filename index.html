@@ -158,9 +158,6 @@
       measurementId: "G-Z9W8PN6QZD"
     };
 
-    // UPDATE THIS TO YOUR EXACT GMAIL ADDRESS
-    const OWNER_EMAIL = "YOUR_EMAIL@gmail.com";
-
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.database();
@@ -196,7 +193,6 @@
 
     auth.onAuthStateChanged(user => {
         if (user) {
-            if (user.email !== OWNER_EMAIL) { auth.signOut(); return; }
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             startListeners();
