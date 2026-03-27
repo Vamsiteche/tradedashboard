@@ -31,85 +31,111 @@
         .badge.short { background: rgba(248, 81, 73, 0.1); color: var(--red); border: 1px solid var(--red); }
         
         .empty-state { text-align: center; padding: 30px; color: #8b949e; font-style: italic; }
+
+        /* Login Screen Styles */
+        #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh; text-align: center; }
+        .google-btn { background-color: #fff; color: #757575; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 24px; font-size: 16px; margin-top: 20px; }
+        .google-btn:hover { background-color: #f1f1f1; filter: none; }
+        .google-icon { width: 18px; height: 18px; }
     </style>
 </head>
 <body>
 
-    <h2>⚡ Master Trading Terminal</h2>
-
-    <div class="card" style="border-left: 4px solid var(--accent);">
-        <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
-        <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
-        <input type="text" id="apiTokenInput" placeholder="Paste Bearer Token Here..." autocomplete="off" />
-        <button onclick="updateApiToken()">Authorize Bot for Today</button>
-        <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
+    <div id="loginScreen">
+        <h1 style="color: #fff; margin-bottom: 5px;">Algo Command Center</h1>
+        <p style="color: #8b949e; margin-bottom: 20px;">Restricted Access. Please authenticate to view live markets.</p>
+        <button class="google-btn" onclick="signInWithGoogle()">
+            <svg class="google-icon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            Sign in with Google
+        </button>
+        <p id="loginError" style="color: var(--red); display: none; margin-top: 15px; font-size: 14px;"></p>
     </div>
 
-    <div class="card">
-        <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (Live)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Side</th>
-                    <th>Qty</th>
-                    <th>Entry Price</th>
-                    <th>Volume Spike</th>
-                </tr>
-            </thead>
-            <tbody id="activePositionsBody">
-                <tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <h3 style="margin-top: 0; color: #fff; display: flex; justify-content: space-between; align-items: center;">
-            <span>📚 Trade Ledger & Analytics</span>
-        </h3>
+    <div id="mainDashboard" style="display: none;">
         
-        <div style="margin-bottom: 20px;">
-            <button class="btn-outline active" onclick="setFilter('today')" id="btn-today">Today</button>
-            <button class="btn-outline" onclick="setFilter('week')" id="btn-week">This Week</button>
-            <button class="btn-outline" onclick="setFilter('month')" id="btn-month">This Month</button>
-            <button class="btn-outline" onclick="setFilter('all')" id="btn-all">All-Time</button>
-        </div>
-
-        <div class="stat-grid">
-            <div class="stat-box">
-                <div class="stat-label">Period Net PnL</div>
-                <div id="calcPnl" class="stat-value">₹0.00</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Total Trades</div>
-                <div id="calcTrades" class="stat-value">0</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Win Rate</div>
-                <div id="calcWinRate" class="stat-value">0%</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+            <h2 style="margin: 0; border: none; padding: 0;">⚡ Master Trading Terminal</h2>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span id="userEmailDisplay" style="color: #8b949e; font-size: 14px;"></span>
+                <button onclick="logoutUser()" style="width: auto; background-color: var(--red); padding: 8px 15px; font-size: 14px; color: white;">Log Out</button>
             </div>
         </div>
 
-        <div style="max-height: 400px; overflow-y: auto;">
+        <div class="card" style="border-left: 4px solid var(--accent);">
+            <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
+            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
+            <input type="text" id="apiTokenInput" placeholder="Paste Bearer Token Here..." autocomplete="off" />
+            <button onclick="updateApiToken()">Authorize Bot for Today</button>
+            <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (Live)</h3>
             <table>
-                <thead style="position: sticky; top: 0; background: var(--card);">
+                <thead>
                     <tr>
-                        <th>Date & Time</th>
                         <th>Symbol</th>
                         <th>Side</th>
-                        <th>Reason</th>
-                        <th>Vol Ratio</th>
-                        <th style="text-align: right;">Net PnL</th>
+                        <th>Qty</th>
+                        <th>Entry Price</th>
+                        <th>Volume Spike</th>
                     </tr>
                 </thead>
-                <tbody id="historyBody">
-                    <tr><td colspan="6" class="empty-state">Loading historical data...</td></tr>
+                <tbody id="activePositionsBody">
+                    <tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>
                 </tbody>
             </table>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-top: 0; color: #fff; display: flex; justify-content: space-between; align-items: center;">
+                <span>📚 Trade Ledger & Analytics</span>
+            </h3>
+            
+            <div style="margin-bottom: 20px;">
+                <button class="btn-outline active" onclick="setFilter('today')" id="btn-today">Today</button>
+                <button class="btn-outline" onclick="setFilter('week')" id="btn-week">This Week</button>
+                <button class="btn-outline" onclick="setFilter('month')" id="btn-month">This Month</button>
+                <button class="btn-outline" onclick="setFilter('all')" id="btn-all">All-Time</button>
+            </div>
+
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Period Net PnL</div>
+                    <div id="calcPnl" class="stat-value">₹0.00</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Total Trades</div>
+                    <div id="calcTrades" class="stat-value">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Win Rate</div>
+                    <div id="calcWinRate" class="stat-value">0%</div>
+                </div>
+            </div>
+
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead style="position: sticky; top: 0; background: var(--card);">
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Symbol</th>
+                            <th>Side</th>
+                            <th>Reason</th>
+                            <th>Vol Ratio</th>
+                            <th style="text-align: right;">Net PnL</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr><td colspan="6" class="empty-state">Loading historical data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script>
@@ -126,10 +152,96 @@
         };
         
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const db = firebase.database();
 
         let allHistoricalTrades = [];
         let currentFilter = 'today';
+        let isDataLoaded = false;
+
+        // ==========================================
+        // AUTHENTICATION LOGIC
+        // ==========================================
+        const provider = new firebase.auth.GoogleAuthProvider();
+
+        function signInWithGoogle() {
+            document.getElementById('loginError').style.display = 'none';
+            auth.signInWithPopup(provider).catch((error) => {
+                document.getElementById('loginError').innerText = "Login Failed: " + error.message;
+                document.getElementById('loginError').style.display = 'block';
+            });
+        }
+
+        function logoutUser() {
+            auth.signOut().catch(error => alert("Logout Error: " + error.message));
+        }
+
+        // Monitor Login State
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Check if they used an authorized email
+                const allowedEmails = ['allamudivamsi@gmail.com', 'thegreat.vamsi6@gmail.com'];
+                if (allowedEmails.includes(user.email)) {
+                    // Success! Show dashboard, hide login.
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('mainDashboard').style.display = 'block';
+                    document.getElementById('userEmailDisplay').innerText = user.email;
+                    
+                    // Only start pulling data once authenticated
+                    if (!isDataLoaded) startDatabaseListeners(); 
+                } else {
+                    // Log them out if they use the wrong email
+                    auth.signOut();
+                    document.getElementById('loginError').innerText = `Unauthorized access for ${user.email}.`;
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } else {
+                // Not logged in. Show login, hide dashboard.
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('mainDashboard').style.display = 'none';
+            }
+        });
+
+        // ==========================================
+        // DATABASE LOGIC (Only runs if logged in)
+        // ==========================================
+        function startDatabaseListeners() {
+            isDataLoaded = true;
+
+            // Listen for Live Active Positions
+            db.ref('dashboard/active_positions').on('value', (snapshot) => {
+                const data = snapshot.val();
+                const tbody = document.getElementById('activePositionsBody');
+                tbody.innerHTML = ''; 
+                
+                if (data && Object.keys(data).length > 0) {
+                    for (const [symbol, pos] of Object.entries(data)) {
+                        const badgeClass = pos.side === 'long' ? 'long' : 'short';
+                        const row = `<tr>
+                            <td style="font-weight: bold; color: #fff;">${symbol}</td>
+                            <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
+                            <td>${pos.qty}</td>
+                            <td>₹${pos.entry_price.toFixed(2)}</td>
+                            <td>${pos.vol_ratio}x</td>
+                        </tr>`;
+                        tbody.innerHTML += row;
+                    }
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>';
+                }
+            });
+
+            // Listen for Permanent Historical Trades
+            db.ref('historical_trades').on('value', (snapshot) => {
+                const data = snapshot.val();
+                allHistoricalTrades = [];
+                if (data) {
+                    for (const key in data) { allHistoricalTrades.push(data[key]); }
+                    allHistoricalTrades.sort((a, b) => new Date(b.time) - new Date(a.time));
+                }
+                applyFilter(); // Render UI
+            });
+        }
 
         // 1. Submit API Token
         function updateApiToken() {
@@ -147,45 +259,11 @@
             }).catch(error => alert("Error saving token: " + error));
         }
 
-        // 2. Listen for Live Active Positions
-        db.ref('dashboard/active_positions').on('value', (snapshot) => {
-            const data = snapshot.val();
-            const tbody = document.getElementById('activePositionsBody');
-            tbody.innerHTML = ''; 
-            
-            if (data && Object.keys(data).length > 0) {
-                for (const [symbol, pos] of Object.entries(data)) {
-                    const badgeClass = pos.side === 'long' ? 'long' : 'short';
-                    const row = `<tr>
-                        <td style="font-weight: bold; color: #fff;">${symbol}</td>
-                        <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
-                        <td>${pos.qty}</td>
-                        <td>₹${pos.entry_price.toFixed(2)}</td>
-                        <td>${pos.vol_ratio}x</td>
-                    </tr>`;
-                    tbody.innerHTML += row;
-                }
-            } else {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>';
-            }
-        });
-
-        // 3. Listen for Permanent Historical Trades
-        db.ref('historical_trades').on('value', (snapshot) => {
-            const data = snapshot.val();
-            allHistoricalTrades = [];
-            if (data) {
-                // Convert Firebase object to Array and sort newest first
-                for (const key in data) { allHistoricalTrades.push(data[key]); }
-                allHistoricalTrades.sort((a, b) => new Date(b.time) - new Date(a.time));
-            }
-            applyFilter(); // Render UI
-        });
-
-        // 4. Filtering & Rendering Logic
+        // ==========================================
+        // FILTERING & RENDERING
+        // ==========================================
         function setFilter(filterType) {
             currentFilter = filterType;
-            // Update button styles
             ['today', 'week', 'month', 'all'].forEach(id => {
                 document.getElementById('btn-' + id).classList.remove('active');
             });
@@ -197,9 +275,8 @@
             const now = new Date();
             let filteredTrades = [];
 
-            // Filter the array
             allHistoricalTrades.forEach(trade => {
-                const tradeDate = new Date(trade.time.replace(/-/g, '/')); // Fix Safari parsing
+                const tradeDate = new Date(trade.time.replace(/-/g, '/')); 
                 
                 let include = false;
                 if (currentFilter === 'today') {
@@ -211,7 +288,7 @@
                 } else if (currentFilter === 'month') {
                     include = tradeDate.getMonth() === now.getMonth() && tradeDate.getFullYear() === now.getFullYear();
                 } else {
-                    include = true; // all
+                    include = true; 
                 }
 
                 if (include) filteredTrades.push(trade);
@@ -249,7 +326,6 @@
                 });
             }
 
-            // Update Top Analytics Board
             const pnlEl = document.getElementById('calcPnl');
             pnlEl.innerText = `₹${totalPnl.toFixed(2)}`;
             pnlEl.className = `stat-value ${totalPnl >= 0 ? 'profit' : 'loss'}`;
