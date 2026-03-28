@@ -275,8 +275,8 @@
             let count = 0;
 
             for (const [symbol, pos] of Object.entries(allActivePositions)) {
-                // Determine the mode of the position (Default to LIVE if missing for backward compatibility)
-                const posMode = pos.mode || 'LIVE';
+                // Determine the mode of the position (Default to PAPER if missing for backward compatibility)
+                const posMode = pos.mode || 'PAPER';
                 
                 if (posMode === currentTradingMode) {
                     count++;
@@ -327,8 +327,8 @@
                     includeTime = true; 
                 }
 
-                // 2. Mode Filter (Default to LIVE if missing)
-                const tradeMode = trade.mode || 'LIVE';
+                // 2. Mode Filter (Default to PAPER if missing)
+                const tradeMode = trade.mode || 'PAPER';
                 const includeMode = (tradeMode === currentTradingMode);
 
                 // Apply both filters
