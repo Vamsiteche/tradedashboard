@@ -15,6 +15,11 @@
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); margin-right: 5px; margin-bottom: 10px;}
         .btn-outline.active { background: var(--accent); color: #0d1117; }
         
+        /* New Tab Styles */
+        .mode-tabs { display: flex; gap: 10px; margin-bottom: 20px; background: var(--card); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+        .mode-btn { flex: 1; padding: 12px; font-size: 16px; border: 1px solid var(--border); background: var(--bg); color: #8b949e; }
+        .mode-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+
         .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 15px; border-radius: 6px; text-align: center; border: 1px solid var(--border); }
         .stat-label { color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
@@ -61,6 +66,11 @@
             </div>
         </div>
 
+        <div class="mode-tabs">
+            <button id="mode-PAPER" class="mode-btn active" onclick="setTradingMode('PAPER')">📄 PAPER TRADING</button>
+            <button id="mode-LIVE" class="mode-btn" onclick="setTradingMode('LIVE')">🚀 LIVE TRADING</button>
+        </div>
+
         <div class="card" style="border-left: 4px solid var(--accent);">
             <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
             <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
@@ -70,7 +80,7 @@
         </div>
 
         <div class="card">
-            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (Live)</h3>
+            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (<span id="activeModeLabel">PAPER</span>)</h3>
             <table>
                 <thead>
                     <tr>
@@ -139,7 +149,6 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <script>
-        // YOUR FIREBASE WEB CONFIG
         const firebaseConfig = {
             apiKey: "AIzaSyBCutkIsHV41yg4G4fCb6QEDEIQHTbETj0",
             authDomain: "algotrade-5da97.firebaseapp.com",
@@ -155,8 +164,11 @@
         const auth = firebase.auth();
         const db = firebase.database();
 
+        // Global State Variables
         let allHistoricalTrades = [];
+        let allActivePositions = {};
         let currentFilter = 'today';
+        let currentTradingMode = 'PAPER'; // Default tab
         let isDataLoaded = false;
 
         // ==========================================
@@ -176,62 +188,39 @@
             auth.signOut().catch(error => alert("Logout Error: " + error.message));
         }
 
-        // Monitor Login State
         auth.onAuthStateChanged((user) => {
             if (user) {
-                // Check if they used an authorized email
                 const allowedEmails = ['allamudivamsi@gmail.com', 'thegreat.vamsi6@gmail.com'];
                 if (allowedEmails.includes(user.email)) {
-                    // Success! Show dashboard, hide login.
                     document.getElementById('loginScreen').style.display = 'none';
                     document.getElementById('mainDashboard').style.display = 'block';
                     document.getElementById('userEmailDisplay').innerText = user.email;
                     
-                    // Only start pulling data once authenticated
                     if (!isDataLoaded) startDatabaseListeners(); 
                 } else {
-                    // Log them out if they use the wrong email
                     auth.signOut();
                     document.getElementById('loginError').innerText = `Unauthorized access for ${user.email}.`;
                     document.getElementById('loginError').style.display = 'block';
                 }
             } else {
-                // Not logged in. Show login, hide dashboard.
                 document.getElementById('loginScreen').style.display = 'flex';
                 document.getElementById('mainDashboard').style.display = 'none';
             }
         });
 
         // ==========================================
-        // DATABASE LOGIC (Only runs if logged in)
+        // DATABASE LOGIC 
         // ==========================================
         function startDatabaseListeners() {
             isDataLoaded = true;
 
-            // Listen for Live Active Positions
+            // 1. Listen for Live Active Positions
             db.ref('dashboard/active_positions').on('value', (snapshot) => {
-                const data = snapshot.val();
-                const tbody = document.getElementById('activePositionsBody');
-                tbody.innerHTML = ''; 
-                
-                if (data && Object.keys(data).length > 0) {
-                    for (const [symbol, pos] of Object.entries(data)) {
-                        const badgeClass = pos.side === 'long' ? 'long' : 'short';
-                        const row = `<tr>
-                            <td style="font-weight: bold; color: #fff;">${symbol}</td>
-                            <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
-                            <td>${pos.qty}</td>
-                            <td>₹${pos.entry_price.toFixed(2)}</td>
-                            <td>${pos.vol_ratio}x</td>
-                        </tr>`;
-                        tbody.innerHTML += row;
-                    }
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>';
-                }
+                allActivePositions = snapshot.val() || {};
+                renderActivePositions();
             });
 
-            // Listen for Permanent Historical Trades
+            // 2. Listen for Permanent Historical Trades
             db.ref('historical_trades').on('value', (snapshot) => {
                 const data = snapshot.val();
                 allHistoricalTrades = [];
@@ -239,11 +228,10 @@
                     for (const key in data) { allHistoricalTrades.push(data[key]); }
                     allHistoricalTrades.sort((a, b) => new Date(b.time) - new Date(a.time));
                 }
-                applyFilter(); // Render UI
+                applyFilter();
             });
         }
 
-        // 1. Submit API Token
         function updateApiToken() {
             const tokenValue = document.getElementById('apiTokenInput').value.trim();
             if (!tokenValue) { alert("Please paste a token first."); return; }
@@ -260,8 +248,55 @@
         }
 
         // ==========================================
+        // TAB SWITCHING (PAPER VS LIVE)
+        // ==========================================
+        function setTradingMode(mode) {
+            currentTradingMode = mode;
+            
+            // Update UI Buttons
+            document.getElementById('mode-PAPER').classList.remove('active');
+            document.getElementById('mode-LIVE').classList.remove('active');
+            document.getElementById('mode-' + mode).classList.add('active');
+            
+            // Update Labels
+            document.getElementById('activeModeLabel').innerText = mode;
+            
+            // Re-render both tables with the new filter
+            renderActivePositions();
+            applyFilter();
+        }
+
+        // ==========================================
         // FILTERING & RENDERING
         // ==========================================
+        function renderActivePositions() {
+            const tbody = document.getElementById('activePositionsBody');
+            tbody.innerHTML = ''; 
+            let count = 0;
+
+            for (const [symbol, pos] of Object.entries(allActivePositions)) {
+                // Determine the mode of the position (Default to LIVE if missing for backward compatibility)
+                const posMode = pos.mode || 'LIVE';
+                
+                if (posMode === currentTradingMode) {
+                    count++;
+                    const badgeClass = pos.side === 'long' ? 'long' : 'short';
+                    const row = `<tr>
+                        <td style="font-weight: bold; color: #fff;">${symbol}</td>
+                        <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
+                        <td>${pos.qty}</td>
+                        <td>₹${pos.entry_price.toFixed(2)}</td>
+                        <td>${pos.vol_ratio}x</td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                }
+            }
+
+            if (count === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades currently open in ' + currentTradingMode + ' mode.</td></tr>';
+            }
+        }
+
         function setFilter(filterType) {
             currentFilter = filterType;
             ['today', 'week', 'month', 'all'].forEach(id => {
@@ -278,20 +313,26 @@
             allHistoricalTrades.forEach(trade => {
                 const tradeDate = new Date(trade.time.replace(/-/g, '/')); 
                 
-                let include = false;
+                // 1. Time Filter
+                let includeTime = false;
                 if (currentFilter === 'today') {
-                    include = tradeDate.toDateString() === now.toDateString();
+                    includeTime = tradeDate.toDateString() === now.toDateString();
                 } else if (currentFilter === 'week') {
                     const oneWeekAgo = new Date();
                     oneWeekAgo.setDate(now.getDate() - 7);
-                    include = tradeDate >= oneWeekAgo;
+                    includeTime = tradeDate >= oneWeekAgo;
                 } else if (currentFilter === 'month') {
-                    include = tradeDate.getMonth() === now.getMonth() && tradeDate.getFullYear() === now.getFullYear();
+                    includeTime = tradeDate.getMonth() === now.getMonth() && tradeDate.getFullYear() === now.getFullYear();
                 } else {
-                    include = true; 
+                    includeTime = true; 
                 }
 
-                if (include) filteredTrades.push(trade);
+                // 2. Mode Filter (Default to LIVE if missing)
+                const tradeMode = trade.mode || 'LIVE';
+                const includeMode = (tradeMode === currentTradingMode);
+
+                // Apply both filters
+                if (includeTime && includeMode) filteredTrades.push(trade);
             });
 
             renderHistoryTable(filteredTrades);
@@ -305,7 +346,7 @@
             let wins = 0;
 
             if (trades.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No trades found for this period.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No ${currentTradingMode} trades found for this period.</td></tr>`;
             } else {
                 trades.forEach(trade => {
                     totalPnl += trade.pnl;
@@ -326,6 +367,7 @@
                 });
             }
 
+            // Update Analytics
             const pnlEl = document.getElementById('calcPnl');
             pnlEl.innerText = `₹${totalPnl.toFixed(2)}`;
             pnlEl.className = `stat-value ${totalPnl >= 0 ? 'profit' : 'loss'}`;
