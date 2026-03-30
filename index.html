@@ -15,10 +15,6 @@
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); margin-right: 5px; margin-bottom: 10px;}
         .btn-outline.active { background: var(--accent); color: #0d1117; }
         
-        .mode-tabs { display: flex; gap: 10px; margin-bottom: 20px; background: var(--card); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
-        .mode-btn { flex: 1; padding: 12px; font-size: 16px; border: 1px solid var(--border); background: var(--bg); color: #8b949e; cursor: pointer; transition: 0.2s;}
-        .mode-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: bold;}
-
         .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 15px; border-radius: 6px; text-align: center; border: 1px solid var(--border); }
         .stat-label { color: #8b949e; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
@@ -67,11 +63,6 @@
             </div>
         </div>
 
-        <div class="mode-tabs">
-            <button id="mode-PAPER" class="mode-btn active" onclick="setTradingMode('PAPER_TRADE')">📄 PAPER TRADING</button>
-            <button id="mode-LIVE" class="mode-btn" onclick="setTradingMode('LIVE_TRADE')">🚀 LIVE TRADING</button>
-        </div>
-
         <div class="card" style="border-left: 4px solid var(--accent);">
             <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
             <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
@@ -81,7 +72,7 @@
         </div>
 
         <div class="card">
-            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (<span id="activeModeLabel">PAPER_TRADE</span>)</h3>
+            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions</h3>
             <table>
                 <thead>
                     <tr>
@@ -139,7 +130,7 @@
                     <div id="calcPnl" class="stat-value">₹0.00</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">Total Trades</div>
+                    <div class="stat-label">Total Executed Trades</div>
                     <div id="calcTrades" class="stat-value">0</div>
                 </div>
                 <div class="stat-box">
@@ -192,7 +183,6 @@
         let allHistoricalTrades = [];
         let allActivePositions = {};
         let currentFilter = 'today';
-        let currentTradingMode = 'PAPER_TRADE'; // Matches Python script's 'MODE' definition
         let isDataLoaded = false;
 
         // ==========================================
@@ -250,7 +240,8 @@
                 allHistoricalTrades = [];
                 if (data) {
                     for (const key in data) { allHistoricalTrades.push(data[key]); }
-                    allHistoricalTrades.sort((a, b) => new Date(b.time) - new Date(a.time));
+                    // Robust cross-browser date sorting
+                    allHistoricalTrades.sort((a, b) => new Date(b.time.replace(/-/g, '/')) - new Date(a.time.replace(/-/g, '/')));
                 }
                 applyFilter();
             });
@@ -261,7 +252,7 @@
                 renderEvaluations(evals);
             });
 
-            // 4. NEW: Listen for Last Update Time
+            // 4. Listen for Last Update Time
             db.ref('dashboard/summary/last_updated').on('value', (snapshot) => {
                 const lastUpdated = snapshot.val();
                 if (lastUpdated) {
@@ -286,31 +277,9 @@
         }
 
         // ==========================================
-        // TAB SWITCHING (PAPER VS LIVE)
-        // ==========================================
-        function setTradingMode(mode) {
-            currentTradingMode = mode;
-            
-            // Update UI Buttons
-            document.getElementById('mode-PAPER').classList.remove('active');
-            document.getElementById('mode-LIVE').classList.remove('active');
-            // We use substring to map 'PAPER_TRADE' to 'mode-PAPER'
-            const tabId = mode === 'PAPER_TRADE' ? 'mode-PAPER' : 'mode-LIVE';
-            document.getElementById(tabId).classList.add('active');
-            
-            // Update Labels
-            document.getElementById('activeModeLabel').innerText = mode.replace('_', ' ');
-            
-            // Re-render tables
-            renderActivePositions();
-            applyFilter();
-        }
-
-        // ==========================================
         // RENDERING FUNCTIONS
         // ==========================================
         
-        // NEW: Render Bot Evaluations
         function renderEvaluations(evals) {
             const tbody = document.getElementById('evaluationsBody');
             tbody.innerHTML = '';
@@ -321,14 +290,14 @@
             }
 
             evals.forEach(ev => {
-                // Determine Badge Color dynamically based on the python bot's exact strings
-                let badgeClass = 'neutral'; // Yellow for Directional Failure
-                const statusStr = ev.status.toLowerCase();
+                let badgeClass = 'neutral'; 
+                const statusStr = (ev.status || "").toLowerCase();
                 
+                // Color code the bot's evaluation logic dynamically
                 if (statusStr.includes('triggered') || statusStr.includes('✅')) {
-                    badgeClass = 'long'; // Green for Success
+                    badgeClass = 'long'; 
                 } else if (statusStr.includes('low volume') || statusStr.includes('❌')) {
-                    badgeClass = 'short'; // Red for Not Enough Volatility
+                    badgeClass = 'short'; 
                 }
 
                 const row = `<tr>
@@ -348,25 +317,20 @@
             let count = 0;
 
             for (const [symbol, pos] of Object.entries(allActivePositions)) {
-                // Assume missing mode means PAPER_TRADE for backwards compatibility
-                const posMode = pos.mode || 'PAPER_TRADE';
-                
-                if (posMode === currentTradingMode) {
-                    count++;
-                    const badgeClass = pos.side === 'long' ? 'long' : 'short';
-                    const row = `<tr>
-                        <td style="font-weight: bold; color: #fff;">${symbol}</td>
-                        <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
-                        <td>${pos.qty}</td>
-                        <td>₹${pos.entry_price.toFixed(2)}</td>
-                        <td>${pos.vol_ratio}x</td>
-                    </tr>`;
-                    tbody.innerHTML += row;
-                }
+                count++;
+                const badgeClass = pos.side === 'long' ? 'long' : 'short';
+                const row = `<tr>
+                    <td style="font-weight: bold; color: #fff;">${symbol}</td>
+                    <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
+                    <td>${pos.qty}</td>
+                    <td>₹${pos.entry_price.toFixed(2)}</td>
+                    <td>${pos.vol_ratio}x</td>
+                </tr>`;
+                tbody.innerHTML += row;
             }
 
             if (count === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active trades currently open in ${currentTradingMode.replace('_', ' ')} mode.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>`;
             }
         }
 
@@ -384,9 +348,9 @@
             let filteredTrades = [];
 
             allHistoricalTrades.forEach(trade => {
+                // Safe parsing for Safari/iOS compatibility
                 const tradeDate = new Date(trade.time.replace(/-/g, '/')); 
                 
-                // 1. Time Filter
                 let includeTime = false;
                 if (currentFilter === 'today') {
                     includeTime = tradeDate.toDateString() === now.toDateString();
@@ -400,12 +364,7 @@
                     includeTime = true; 
                 }
 
-                // 2. Mode Filter (Assume PAPER_TRADE if not explicitly marked in old DB records)
-                const tradeMode = trade.mode || 'PAPER_TRADE';
-                const includeMode = (tradeMode === currentTradingMode);
-
-                // Apply both filters
-                if (includeTime && includeMode) filteredTrades.push(trade);
+                if (includeTime) filteredTrades.push(trade);
             });
 
             renderHistoryTable(filteredTrades);
@@ -416,30 +375,37 @@
             tbody.innerHTML = '';
 
             let totalPnl = 0;
-            let wins = 0;
+            let exitTradesCount = 0;
+            let winningTradesCount = 0;
 
             if (trades.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No trades found for this period in ${currentTradingMode.replace('_', ' ')} mode.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No trades found for this period.</td></tr>`;
             } else {
                 trades.forEach(trade => {
-                    const pnlVal = (trade.pnl && trade.pnl !== "-") ? parseFloat(trade.pnl) : 0;
-                    totalPnl += pnlVal;
-                    if (pnlVal > 0) wins++;
-
-                    const badgeClass = trade.side === 'long' ? 'long' : 'short';
                     let pnlStr = "-";
                     let pnlClass = "";
                     
-                    if (trade.pnl !== "-") {
+                    // 🚨 CRITICAL FIX: Only calculate PnL and Win Rate for closed "EXIT" trades!
+                    // This prevents double-counting entries and mathematical errors from "-" strings
+                    if (trade.action === 'EXIT') {
+                        const pnlVal = parseFloat(trade.pnl) || 0;
+                        totalPnl += pnlVal;
+                        exitTradesCount++;
+                        
+                        if (pnlVal > 0) winningTradesCount++;
+                        
                         pnlClass = pnlVal >= 0 ? 'profit' : 'loss';
                         pnlStr = `₹${pnlVal.toFixed(2)}`;
                     }
+
+                    const badgeClass = trade.side === 'long' ? 'long' : 'short';
+                    const actionLabel = trade.reason || trade.action || "Signal";
                     
                     const row = `<tr>
                         <td style="color: #8b949e;">${trade.time}</td>
                         <td style="font-weight: bold; color: #fff;">${trade.symbol}</td>
-                        <td><span class="badge ${badgeClass}">${trade.side.toUpperCase()}</span></td>
-                        <td>${trade.reason}</td>
+                        <td><span class="badge ${badgeClass}">${(trade.side || '').toUpperCase()}</span></td>
+                        <td>${actionLabel}</td>
                         <td>${trade.vol_ratio}x</td>
                         <td class="${pnlClass}" style="text-align: right; font-weight: bold;">${pnlStr}</td>
                     </tr>`;
@@ -447,16 +413,14 @@
                 });
             }
 
-            // Update Analytics correctly
+            // Update Analytics mathematically correctly
             const pnlEl = document.getElementById('calcPnl');
             pnlEl.innerText = `₹${totalPnl.toFixed(2)}`;
             pnlEl.className = `stat-value ${totalPnl >= 0 ? 'profit' : 'loss'}`;
             
-            // Only count executed EXITS for the Win Rate to be accurate
-            const exitTrades = trades.filter(t => t.action === 'EXIT').length;
-            document.getElementById('calcTrades').innerText = exitTrades;
+            document.getElementById('calcTrades').innerText = exitTradesCount;
             
-            const winRate = exitTrades > 0 ? ((wins / exitTrades) * 100).toFixed(1) : 0;
+            const winRate = exitTradesCount > 0 ? ((winningTradesCount / exitTradesCount) * 100).toFixed(1) : 0;
             document.getElementById('calcWinRate').innerText = `${winRate}%`;
         }
     </script>
