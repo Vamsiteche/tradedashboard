@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Master Trading Terminal</title>
     <style>
-        :root { --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --border: #30363d; }
+        :root { --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922; --border: #30363d; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; max-width: 1000px; margin: auto; }
         h2 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; color: #fff; }
         .card { background-color: var(--card); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
@@ -15,10 +15,9 @@
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); margin-right: 5px; margin-bottom: 10px;}
         .btn-outline.active { background: var(--accent); color: #0d1117; }
         
-        /* New Tab Styles */
         .mode-tabs { display: flex; gap: 10px; margin-bottom: 20px; background: var(--card); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
-        .mode-btn { flex: 1; padding: 12px; font-size: 16px; border: 1px solid var(--border); background: var(--bg); color: #8b949e; }
-        .mode-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+        .mode-btn { flex: 1; padding: 12px; font-size: 16px; border: 1px solid var(--border); background: var(--bg); color: #8b949e; cursor: pointer; transition: 0.2s;}
+        .mode-btn.active { background: var(--accent); color: #0d1117; border-color: var(--accent); font-weight: bold;}
 
         .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .stat-box { background: var(--bg); padding: 15px; border-radius: 6px; text-align: center; border: 1px solid var(--border); }
@@ -31,15 +30,17 @@
         th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--border); }
         th { color: #8b949e; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
         tr:hover { background-color: rgba(255,255,255,0.02); }
-        .badge { padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; display: inline-block;}
         .badge.long { background: rgba(63, 185, 80, 0.1); color: var(--green); border: 1px solid var(--green); }
         .badge.short { background: rgba(248, 81, 73, 0.1); color: var(--red); border: 1px solid var(--red); }
+        .badge.neutral { background: rgba(210, 153, 34, 0.1); color: var(--yellow); border: 1px solid var(--yellow); }
         
         .empty-state { text-align: center; padding: 30px; color: #8b949e; font-style: italic; }
 
         /* Login Screen Styles */
         #loginScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 70vh; text-align: center; }
-        .google-btn { background-color: #fff; color: #757575; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 24px; font-size: 16px; margin-top: 20px; }
+        .google-btn { background-color: #fff; color: #757575; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px 24px; font-size: 16px; margin-top: 20px; cursor: pointer; border-radius: 4px;}
         .google-btn:hover { background-color: #f1f1f1; filter: none; }
         .google-icon { width: 18px; height: 18px; }
     </style>
@@ -67,8 +68,8 @@
         </div>
 
         <div class="mode-tabs">
-            <button id="mode-PAPER" class="mode-btn active" onclick="setTradingMode('PAPER')">📄 PAPER TRADING</button>
-            <button id="mode-LIVE" class="mode-btn" onclick="setTradingMode('LIVE')">🚀 LIVE TRADING</button>
+            <button id="mode-PAPER" class="mode-btn active" onclick="setTradingMode('PAPER_TRADE')">📄 PAPER TRADING</button>
+            <button id="mode-LIVE" class="mode-btn" onclick="setTradingMode('LIVE_TRADE')">🚀 LIVE TRADING</button>
         </div>
 
         <div class="card" style="border-left: 4px solid var(--accent);">
@@ -80,7 +81,7 @@
         </div>
 
         <div class="card">
-            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (<span id="activeModeLabel">PAPER</span>)</h3>
+            <h3 style="margin-top: 0; color: #fff;">🟢 Open Positions (<span id="activeModeLabel">PAPER_TRADE</span>)</h3>
             <table>
                 <thead>
                     <tr>
@@ -93,6 +94,29 @@
                 </thead>
                 <tbody id="activePositionsBody">
                     <tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- NEW: BOT THINKING & EVALUATIONS CARD -->
+        <div class="card" style="border-left: 4px solid var(--yellow);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #fff;">🧠 Bot Thinking (Live Feed)</h3>
+                <span id="lastEvalTime" style="font-size: 12px; color: #8b949e; font-family: monospace;">Awaiting Data...</span>
+            </div>
+            <p style="font-size: 13px; color: #8b949e; margin-top: -5px; margin-bottom: 15px;">Latest 5-Minute Candle Evaluations across Universe</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Current Vol</th>
+                        <th>Target Vol</th>
+                        <th>VWAP Dist</th>
+                        <th>Signal Status</th>
+                    </tr>
+                </thead>
+                <tbody id="evaluationsBody">
+                    <tr><td colspan="5" class="empty-state">Waiting for next 5-minute candle evaluation...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -168,7 +192,7 @@
         let allHistoricalTrades = [];
         let allActivePositions = {};
         let currentFilter = 'today';
-        let currentTradingMode = 'PAPER'; // Default tab
+        let currentTradingMode = 'PAPER_TRADE'; // Matches Python script's 'MODE' definition
         let isDataLoaded = false;
 
         // ==========================================
@@ -230,6 +254,20 @@
                 }
                 applyFilter();
             });
+
+            // 3. NEW: Listen for Latest 5-min Evaluations (Bot Brain)
+            db.ref('dashboard/latest_evaluations').on('value', (snapshot) => {
+                const evals = snapshot.val() || [];
+                renderEvaluations(evals);
+            });
+
+            // 4. NEW: Listen for Last Update Time
+            db.ref('dashboard/summary/last_updated').on('value', (snapshot) => {
+                const lastUpdated = snapshot.val();
+                if (lastUpdated) {
+                    document.getElementById('lastEvalTime').innerText = `Last Cycle: ${lastUpdated}`;
+                }
+            });
         }
 
         function updateApiToken() {
@@ -256,27 +294,62 @@
             // Update UI Buttons
             document.getElementById('mode-PAPER').classList.remove('active');
             document.getElementById('mode-LIVE').classList.remove('active');
-            document.getElementById('mode-' + mode).classList.add('active');
+            // We use substring to map 'PAPER_TRADE' to 'mode-PAPER'
+            const tabId = mode === 'PAPER_TRADE' ? 'mode-PAPER' : 'mode-LIVE';
+            document.getElementById(tabId).classList.add('active');
             
             // Update Labels
-            document.getElementById('activeModeLabel').innerText = mode;
+            document.getElementById('activeModeLabel').innerText = mode.replace('_', ' ');
             
-            // Re-render both tables with the new filter
+            // Re-render tables
             renderActivePositions();
             applyFilter();
         }
 
         // ==========================================
-        // FILTERING & RENDERING
+        // RENDERING FUNCTIONS
         // ==========================================
+        
+        // NEW: Render Bot Evaluations
+        function renderEvaluations(evals) {
+            const tbody = document.getElementById('evaluationsBody');
+            tbody.innerHTML = '';
+
+            if (evals.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Waiting for next 5-minute candle evaluation...</td></tr>';
+                return;
+            }
+
+            evals.forEach(ev => {
+                // Determine Badge Color dynamically based on the python bot's exact strings
+                let badgeClass = 'neutral'; // Yellow for Directional Failure
+                const statusStr = ev.status.toLowerCase();
+                
+                if (statusStr.includes('triggered') || statusStr.includes('✅')) {
+                    badgeClass = 'long'; // Green for Success
+                } else if (statusStr.includes('low volume') || statusStr.includes('❌')) {
+                    badgeClass = 'short'; // Red for Not Enough Volatility
+                }
+
+                const row = `<tr>
+                    <td style="font-weight: bold; color: #fff;">${ev.symbol}</td>
+                    <td style="font-family: monospace;">${ev.vol_ratio}</td>
+                    <td style="color: #8b949e; font-family: monospace;">${ev.target}</td>
+                    <td style="font-family: monospace;">${ev.vwap_dist}</td>
+                    <td><span class="badge ${badgeClass}">${ev.status}</span></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+
         function renderActivePositions() {
             const tbody = document.getElementById('activePositionsBody');
             tbody.innerHTML = ''; 
             let count = 0;
 
             for (const [symbol, pos] of Object.entries(allActivePositions)) {
-                // Determine the mode of the position (Default to PAPER if missing for backward compatibility)
-                const posMode = pos.mode || 'PAPER';
+                // Assume missing mode means PAPER_TRADE for backwards compatibility
+                const posMode = pos.mode || 'PAPER_TRADE';
                 
                 if (posMode === currentTradingMode) {
                     count++;
@@ -293,7 +366,7 @@
             }
 
             if (count === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No active trades currently open in ' + currentTradingMode + ' mode.</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active trades currently open in ${currentTradingMode.replace('_', ' ')} mode.</td></tr>`;
             }
         }
 
@@ -327,8 +400,8 @@
                     includeTime = true; 
                 }
 
-                // 2. Mode Filter (Default to PAPER if missing)
-                const tradeMode = trade.mode || 'PAPER';
+                // 2. Mode Filter (Assume PAPER_TRADE if not explicitly marked in old DB records)
+                const tradeMode = trade.mode || 'PAPER_TRADE';
                 const includeMode = (tradeMode === currentTradingMode);
 
                 // Apply both filters
@@ -346,14 +419,21 @@
             let wins = 0;
 
             if (trades.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No ${currentTradingMode} trades found for this period.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No trades found for this period in ${currentTradingMode.replace('_', ' ')} mode.</td></tr>`;
             } else {
                 trades.forEach(trade => {
-                    totalPnl += trade.pnl;
-                    if (trade.pnl > 0) wins++;
+                    const pnlVal = (trade.pnl && trade.pnl !== "-") ? parseFloat(trade.pnl) : 0;
+                    totalPnl += pnlVal;
+                    if (pnlVal > 0) wins++;
 
                     const badgeClass = trade.side === 'long' ? 'long' : 'short';
-                    const pnlClass = trade.pnl >= 0 ? 'profit' : 'loss';
+                    let pnlStr = "-";
+                    let pnlClass = "";
+                    
+                    if (trade.pnl !== "-") {
+                        pnlClass = pnlVal >= 0 ? 'profit' : 'loss';
+                        pnlStr = `₹${pnlVal.toFixed(2)}`;
+                    }
                     
                     const row = `<tr>
                         <td style="color: #8b949e;">${trade.time}</td>
@@ -361,20 +441,22 @@
                         <td><span class="badge ${badgeClass}">${trade.side.toUpperCase()}</span></td>
                         <td>${trade.reason}</td>
                         <td>${trade.vol_ratio}x</td>
-                        <td class="${pnlClass}" style="text-align: right; font-weight: bold;">₹${trade.pnl.toFixed(2)}</td>
+                        <td class="${pnlClass}" style="text-align: right; font-weight: bold;">${pnlStr}</td>
                     </tr>`;
                     tbody.innerHTML += row;
                 });
             }
 
-            // Update Analytics
+            // Update Analytics correctly
             const pnlEl = document.getElementById('calcPnl');
             pnlEl.innerText = `₹${totalPnl.toFixed(2)}`;
             pnlEl.className = `stat-value ${totalPnl >= 0 ? 'profit' : 'loss'}`;
             
-            document.getElementById('calcTrades').innerText = trades.length;
+            // Only count executed EXITS for the Win Rate to be accurate
+            const exitTrades = trades.filter(t => t.action === 'EXIT').length;
+            document.getElementById('calcTrades').innerText = exitTrades;
             
-            const winRate = trades.length > 0 ? ((wins / trades.length) * 100).toFixed(1) : 0;
+            const winRate = exitTrades > 0 ? ((wins / exitTrades) * 100).toFixed(1) : 0;
             document.getElementById('calcWinRate').innerText = `${winRate}%`;
         }
     </script>
