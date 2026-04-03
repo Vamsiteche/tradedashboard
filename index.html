@@ -64,8 +64,14 @@
         </div>
 
         <div class="card" style="border-left: 4px solid var(--accent);">
-            <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
-            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; color: #fff;">🔑 Broker Authorization</h3>
+                <select id="brokerSelect" onchange="handleBrokerChange()" style="background: var(--bg); color: #fff; border: 1px solid var(--border); padding: 5px 10px; border-radius: 4px; cursor: pointer; outline: none;">
+                    <option value="indstocks">INDStocks</option>
+                    <option value="flattrade">FlatTrade</option>
+                </select>
+            </div>
+            <p id="brokerInstructions" style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant Bearer token before 9:15 AM IST.</p>
             <input type="text" id="apiTokenInput" placeholder="Paste Bearer Token Here..." autocomplete="off" />
             <button onclick="updateApiToken()">Authorize Bot for Today</button>
             <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
@@ -89,7 +95,6 @@
             </table>
         </div>
 
-        <!-- NEW: BOT THINKING & EVALUATIONS CARD -->
         <div class="card" style="border-left: 4px solid var(--yellow);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="margin: 0; color: #fff;">🧠 Bot Thinking (Live Feed)</h3>
@@ -179,15 +184,11 @@
         const auth = firebase.auth();
         const db = firebase.database();
 
-        // Global State Variables
         let allHistoricalTrades = [];
         let allActivePositions = {};
         let currentFilter = 'today';
         let isDataLoaded = false;
 
-        // ==========================================
-        // AUTHENTICATION LOGIC
-        // ==========================================
         const provider = new firebase.auth.GoogleAuthProvider();
 
         function signInWithGoogle() {
@@ -222,37 +223,38 @@
             }
         });
 
-        // ==========================================
-        // DATABASE LOGIC 
-        // ==========================================
         function startDatabaseListeners() {
             isDataLoaded = true;
 
-            // 1. Listen for Live Active Positions
+            // NEW: Listen for Broker Config to sync UI dropdown
+            db.ref('settings/broker_config').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data && data.broker) {
+                    document.getElementById('brokerSelect').value = data.broker;
+                    handleBrokerChange();
+                }
+            });
+
             db.ref('dashboard/active_positions').on('value', (snapshot) => {
                 allActivePositions = snapshot.val() || {};
                 renderActivePositions();
             });
 
-            // 2. Listen for Permanent Historical Trades
             db.ref('historical_trades').on('value', (snapshot) => {
                 const data = snapshot.val();
                 allHistoricalTrades = [];
                 if (data) {
                     for (const key in data) { allHistoricalTrades.push(data[key]); }
-                    // Robust cross-browser date sorting
                     allHistoricalTrades.sort((a, b) => new Date(b.time.replace(/-/g, '/')) - new Date(a.time.replace(/-/g, '/')));
                 }
                 applyFilter();
             });
 
-            // 3. NEW: Listen for Latest 5-min Evaluations (Bot Brain)
             db.ref('dashboard/latest_evaluations').on('value', (snapshot) => {
                 const evals = snapshot.val() || [];
                 renderEvaluations(evals);
             });
 
-            // 4. Listen for Last Update Time
             db.ref('dashboard/summary/last_updated').on('value', (snapshot) => {
                 const lastUpdated = snapshot.val();
                 if (lastUpdated) {
@@ -261,11 +263,32 @@
             });
         }
 
+        function handleBrokerChange() {
+            const broker = document.getElementById('brokerSelect').value;
+            const instructions = document.getElementById('brokerInstructions');
+            const input = document.getElementById('apiTokenInput');
+            
+            if (broker === 'flattrade') {
+                instructions.innerHTML = "Format required: <strong>User_ID|API_Token</strong> (e.g. <code>FT12345|eyJhbGci...</code>)";
+                input.placeholder = "Paste USER_ID|API_TOKEN here...";
+            } else {
+                instructions.innerHTML = "Paste your daily SEBI-compliant Bearer token before 9:15 AM IST.";
+                input.placeholder = "Paste Bearer Token Here...";
+            }
+        }
+
         function updateApiToken() {
             const tokenValue = document.getElementById('apiTokenInput').value.trim();
-            if (!tokenValue) { alert("Please paste a token first."); return; }
+            const brokerValue = document.getElementById('brokerSelect').value;
+            
+            if (!tokenValue) { alert("Please paste the token first."); return; }
+            if (brokerValue === 'flattrade' && !tokenValue.includes('|')) {
+                alert("Invalid format for FlatTrade. Please ensure you include your User ID and Token separated by a pipe character '|' (e.g., FT12345|eyJhbG...).");
+                return;
+            }
 
-            db.ref('settings/api_token').set({
+            db.ref('settings/broker_config').set({
+                broker: brokerValue,
                 token: tokenValue,
                 timestamp: new Date().toLocaleString()
             }).then(() => {
@@ -273,13 +296,9 @@
                 status.style.display = 'inline';
                 document.getElementById('apiTokenInput').value = ''; 
                 setTimeout(() => status.style.display = 'none', 4000);
-            }).catch(error => alert("Error saving token: " + error));
+            }).catch(error => alert("Error saving config: " + error));
         }
 
-        // ==========================================
-        // RENDERING FUNCTIONS
-        // ==========================================
-        
         function renderEvaluations(evals) {
             const tbody = document.getElementById('evaluationsBody');
             tbody.innerHTML = '';
@@ -293,7 +312,6 @@
                 let badgeClass = 'neutral'; 
                 const statusStr = (ev.status || "").toLowerCase();
                 
-                // Color code the bot's evaluation logic dynamically
                 if (statusStr.includes('triggered') || statusStr.includes('✅')) {
                     badgeClass = 'long'; 
                 } else if (statusStr.includes('low volume') || statusStr.includes('❌')) {
@@ -348,7 +366,6 @@
             let filteredTrades = [];
 
             allHistoricalTrades.forEach(trade => {
-                // Safe parsing for Safari/iOS compatibility
                 const tradeDate = new Date(trade.time.replace(/-/g, '/')); 
                 
                 let includeTime = false;
@@ -385,8 +402,6 @@
                     let pnlStr = "-";
                     let pnlClass = "";
                     
-                    // 🚨 CRITICAL FIX: Only calculate PnL and Win Rate for closed "EXIT" trades!
-                    // This prevents double-counting entries and mathematical errors from "-" strings
                     if (trade.action === 'EXIT') {
                         const pnlVal = parseFloat(trade.pnl) || 0;
                         totalPnl += pnlVal;
@@ -413,7 +428,6 @@
                 });
             }
 
-            // Update Analytics mathematically correctly
             const pnlEl = document.getElementById('calcPnl');
             pnlEl.innerText = `₹${totalPnl.toFixed(2)}`;
             pnlEl.className = `stat-value ${totalPnl >= 0 ? 'profit' : 'loss'}`;
