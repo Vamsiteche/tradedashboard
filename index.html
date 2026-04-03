@@ -31,6 +31,7 @@
         .badge.long { background: rgba(63, 185, 80, 0.1); color: var(--green); border: 1px solid var(--green); }
         .badge.short { background: rgba(248, 81, 73, 0.1); color: var(--red); border: 1px solid var(--red); }
         .badge.neutral { background: rgba(210, 153, 34, 0.1); color: var(--yellow); border: 1px solid var(--yellow); }
+        .badge.strategy { background: rgba(88, 166, 255, 0.1); color: var(--accent); border: 1px solid var(--accent); }
         
         .empty-state { text-align: center; padding: 30px; color: #8b949e; font-style: italic; }
 
@@ -83,6 +84,7 @@
                 <thead>
                     <tr>
                         <th>Symbol</th>
+                        <th>Strategy</th>
                         <th>Side</th>
                         <th>Qty</th>
                         <th>Entry Price</th>
@@ -90,7 +92,7 @@
                     </tr>
                 </thead>
                 <tbody id="activePositionsBody">
-                    <tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>
+                    <tr><td colspan="6" class="empty-state">No active trades currently open.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -150,6 +152,7 @@
                         <tr>
                             <th>Date & Time</th>
                             <th>Symbol</th>
+                            <th>Strategy</th>
                             <th>Side</th>
                             <th>Reason</th>
                             <th>Vol Ratio</th>
@@ -157,7 +160,7 @@
                         </tr>
                     </thead>
                     <tbody id="historyBody">
-                        <tr><td colspan="6" class="empty-state">Loading historical data...</td></tr>
+                        <tr><td colspan="7" class="empty-state">Loading historical data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -226,7 +229,6 @@
         function startDatabaseListeners() {
             isDataLoaded = true;
 
-            // NEW: Listen for Broker Config to sync UI dropdown
             db.ref('settings/broker_config').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data && data.broker) {
@@ -334,11 +336,15 @@
             tbody.innerHTML = ''; 
             let count = 0;
 
-            for (const [symbol, pos] of Object.entries(allActivePositions)) {
+            for (const [key, pos] of Object.entries(allActivePositions)) {
                 count++;
                 const badgeClass = pos.side === 'long' ? 'long' : 'short';
+                const strategyName = pos.strategy || 'VWAP_BREAKOUT';
+                const displaySymbol = pos.symbol || key; 
+                
                 const row = `<tr>
-                    <td style="font-weight: bold; color: #fff;">${symbol}</td>
+                    <td style="font-weight: bold; color: #fff;">${displaySymbol}</td>
+                    <td><span class="badge strategy">${strategyName.replace('_', ' ')}</span></td>
                     <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
                     <td>${pos.qty}</td>
                     <td>₹${pos.entry_price.toFixed(2)}</td>
@@ -348,7 +354,7 @@
             }
 
             if (count === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No active trades currently open.</td></tr>`;
             }
         }
 
@@ -396,7 +402,7 @@
             let winningTradesCount = 0;
 
             if (trades.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No trades found for this period.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No trades found for this period.</td></tr>`;
             } else {
                 trades.forEach(trade => {
                     let pnlStr = "-";
@@ -415,10 +421,12 @@
 
                     const badgeClass = trade.side === 'long' ? 'long' : 'short';
                     const actionLabel = trade.reason || trade.action || "Signal";
+                    const strategyName = trade.strategy || 'VWAP_BREAKOUT';
                     
                     const row = `<tr>
                         <td style="color: #8b949e;">${trade.time}</td>
                         <td style="font-weight: bold; color: #fff;">${trade.symbol}</td>
+                        <td><span class="badge strategy">${strategyName.replace('_', ' ')}</span></td>
                         <td><span class="badge ${badgeClass}">${(trade.side || '').toUpperCase()}</span></td>
                         <td>${actionLabel}</td>
                         <td>${trade.vol_ratio}x</td>
