@@ -9,7 +9,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; max-width: 1000px; margin: auto; }
         h2 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; color: #fff; }
         .card { background-color: var(--card); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        input { width: calc(100% - 24px); padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: white; font-family: monospace; }
+        textarea { width: calc(100% - 24px); padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: white; font-family: monospace; resize: vertical; min-height: 60px;}
         button { background-color: var(--accent); color: #0d1117; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover { filter: brightness(1.1); }
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); margin-right: 5px; margin-bottom: 10px;}
@@ -31,7 +31,6 @@
         .badge.long { background: rgba(63, 185, 80, 0.1); color: var(--green); border: 1px solid var(--green); }
         .badge.short { background: rgba(248, 81, 73, 0.1); color: var(--red); border: 1px solid var(--red); }
         .badge.neutral { background: rgba(210, 153, 34, 0.1); color: var(--yellow); border: 1px solid var(--yellow); }
-        .badge.strategy { background: rgba(88, 166, 255, 0.1); color: var(--accent); border: 1px solid var(--accent); }
         
         .empty-state { text-align: center; padding: 30px; color: #8b949e; font-style: italic; }
 
@@ -65,17 +64,17 @@
         </div>
 
         <div class="card" style="border-left: 4px solid var(--accent);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0; color: #fff;">🔑 Broker Authorization</h3>
-                <select id="brokerSelect" onchange="handleBrokerChange()" style="background: var(--bg); color: #fff; border: 1px solid var(--border); padding: 5px 10px; border-radius: 4px; cursor: pointer; outline: none;">
-                    <option value="indstocks">INDStocks</option>
-                    <option value="flattrade">FlatTrade</option>
-                </select>
+            <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
+            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
+            <textarea id="apiTokenInput" placeholder="Paste Full Token Here..." autocomplete="off"></textarea>
+            <div>
+                <button onclick="updateApiToken()">Authorize Bot for Today</button>
+                <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
             </div>
-            <p id="brokerInstructions" style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant Bearer token before 9:15 AM IST.</p>
-            <input type="text" id="apiTokenInput" placeholder="Paste Bearer Token Here..." autocomplete="off" />
-            <button onclick="updateApiToken()">Authorize Bot for Today</button>
-            <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
+            <!-- LIVE DATABASE VERIFICATION -->
+            <div id="dbTokenVerification" style="margin-top: 12px; font-size: 13px; color: var(--yellow); font-family: monospace;">
+                Waiting for Firebase sync...
+            </div>
         </div>
 
         <div class="card">
@@ -84,7 +83,6 @@
                 <thead>
                     <tr>
                         <th>Symbol</th>
-                        <th>Strategy</th>
                         <th>Side</th>
                         <th>Qty</th>
                         <th>Entry Price</th>
@@ -92,7 +90,7 @@
                     </tr>
                 </thead>
                 <tbody id="activePositionsBody">
-                    <tr><td colspan="6" class="empty-state">No active trades currently open.</td></tr>
+                    <tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -152,7 +150,6 @@
                         <tr>
                             <th>Date & Time</th>
                             <th>Symbol</th>
-                            <th>Strategy</th>
                             <th>Side</th>
                             <th>Reason</th>
                             <th>Vol Ratio</th>
@@ -160,7 +157,7 @@
                         </tr>
                     </thead>
                     <tbody id="historyBody">
-                        <tr><td colspan="7" class="empty-state">Loading historical data...</td></tr>
+                        <tr><td colspan="6" class="empty-state">Loading historical data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -187,11 +184,15 @@
         const auth = firebase.auth();
         const db = firebase.database();
 
+        // Global State Variables
         let allHistoricalTrades = [];
         let allActivePositions = {};
         let currentFilter = 'today';
         let isDataLoaded = false;
 
+        // ==========================================
+        // AUTHENTICATION LOGIC
+        // ==========================================
         const provider = new firebase.auth.GoogleAuthProvider();
 
         function signInWithGoogle() {
@@ -226,22 +227,32 @@
             }
         });
 
+        // ==========================================
+        // DATABASE LOGIC 
+        // ==========================================
         function startDatabaseListeners() {
             isDataLoaded = true;
 
-            db.ref('settings/broker_config').on('value', (snapshot) => {
+            // 0. Live Token Sync Verifier
+            db.ref('settings/api_token').on('value', (snapshot) => {
                 const data = snapshot.val();
-                if (data && data.broker) {
-                    document.getElementById('brokerSelect').value = data.broker;
-                    handleBrokerChange();
+                const vDiv = document.getElementById('dbTokenVerification');
+                if (data && data.token) {
+                    const t = data.token.trim();
+                    const masked = t.length > 10 ? (t.substring(0, 8) + "......" + t.substring(t.length - 8)) : t;
+                    vDiv.innerHTML = `Active DB Token: [ ${masked} ]<br>Saved at: ${data.timestamp || 'Unknown Time'}`;
+                } else {
+                    vDiv.innerHTML = "No active token found in Firebase.";
                 }
             });
 
+            // 1. Listen for Live Active Positions
             db.ref('dashboard/active_positions').on('value', (snapshot) => {
                 allActivePositions = snapshot.val() || {};
                 renderActivePositions();
             });
 
+            // 2. Listen for Permanent Historical Trades
             db.ref('historical_trades').on('value', (snapshot) => {
                 const data = snapshot.val();
                 allHistoricalTrades = [];
@@ -252,11 +263,13 @@
                 applyFilter();
             });
 
+            // 3. Listen for Latest 5-min Evaluations (Bot Brain)
             db.ref('dashboard/latest_evaluations').on('value', (snapshot) => {
                 const evals = snapshot.val() || [];
                 renderEvaluations(evals);
             });
 
+            // 4. Listen for Last Update Time
             db.ref('dashboard/summary/last_updated').on('value', (snapshot) => {
                 const lastUpdated = snapshot.val();
                 if (lastUpdated) {
@@ -265,32 +278,11 @@
             });
         }
 
-        function handleBrokerChange() {
-            const broker = document.getElementById('brokerSelect').value;
-            const instructions = document.getElementById('brokerInstructions');
-            const input = document.getElementById('apiTokenInput');
-            
-            if (broker === 'flattrade') {
-                instructions.innerHTML = "Format required: <strong>User_ID|API_Token</strong> (e.g. <code>FT12345|eyJhbGci...</code>)";
-                input.placeholder = "Paste USER_ID|API_TOKEN here...";
-            } else {
-                instructions.innerHTML = "Paste your daily SEBI-compliant Bearer token before 9:15 AM IST.";
-                input.placeholder = "Paste Bearer Token Here...";
-            }
-        }
-
         function updateApiToken() {
             const tokenValue = document.getElementById('apiTokenInput').value.trim();
-            const brokerValue = document.getElementById('brokerSelect').value;
-            
-            if (!tokenValue) { alert("Please paste the token first."); return; }
-            if (brokerValue === 'flattrade' && !tokenValue.includes('|')) {
-                alert("Invalid format for FlatTrade. Please ensure you include your User ID and Token separated by a pipe character '|' (e.g., FT12345|eyJhbG...).");
-                return;
-            }
+            if (!tokenValue) { alert("Please paste a token first."); return; }
 
-            db.ref('settings/broker_config').set({
-                broker: brokerValue,
+            db.ref('settings/api_token').set({
                 token: tokenValue,
                 timestamp: new Date().toLocaleString()
             }).then(() => {
@@ -298,9 +290,13 @@
                 status.style.display = 'inline';
                 document.getElementById('apiTokenInput').value = ''; 
                 setTimeout(() => status.style.display = 'none', 4000);
-            }).catch(error => alert("Error saving config: " + error));
+            }).catch(error => alert("Error saving token: " + error));
         }
 
+        // ==========================================
+        // RENDERING FUNCTIONS
+        // ==========================================
+        
         function renderEvaluations(evals) {
             const tbody = document.getElementById('evaluationsBody');
             tbody.innerHTML = '';
@@ -336,15 +332,11 @@
             tbody.innerHTML = ''; 
             let count = 0;
 
-            for (const [key, pos] of Object.entries(allActivePositions)) {
+            for (const [symbol, pos] of Object.entries(allActivePositions)) {
                 count++;
                 const badgeClass = pos.side === 'long' ? 'long' : 'short';
-                const strategyName = pos.strategy || 'VWAP_BREAKOUT';
-                const displaySymbol = pos.symbol || key; 
-                
                 const row = `<tr>
-                    <td style="font-weight: bold; color: #fff;">${displaySymbol}</td>
-                    <td><span class="badge strategy">${strategyName.replace('_', ' ')}</span></td>
+                    <td style="font-weight: bold; color: #fff;">${symbol}</td>
                     <td><span class="badge ${badgeClass}">${pos.side.toUpperCase()}</span></td>
                     <td>${pos.qty}</td>
                     <td>₹${pos.entry_price.toFixed(2)}</td>
@@ -354,7 +346,7 @@
             }
 
             if (count === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No active trades currently open.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No active trades currently open.</td></tr>`;
             }
         }
 
@@ -402,7 +394,7 @@
             let winningTradesCount = 0;
 
             if (trades.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No trades found for this period.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No trades found for this period.</td></tr>`;
             } else {
                 trades.forEach(trade => {
                     let pnlStr = "-";
@@ -421,12 +413,10 @@
 
                     const badgeClass = trade.side === 'long' ? 'long' : 'short';
                     const actionLabel = trade.reason || trade.action || "Signal";
-                    const strategyName = trade.strategy || 'VWAP_BREAKOUT';
                     
                     const row = `<tr>
                         <td style="color: #8b949e;">${trade.time}</td>
                         <td style="font-weight: bold; color: #fff;">${trade.symbol}</td>
-                        <td><span class="badge strategy">${strategyName.replace('_', ' ')}</span></td>
                         <td><span class="badge ${badgeClass}">${(trade.side || '').toUpperCase()}</span></td>
                         <td>${actionLabel}</td>
                         <td>${trade.vol_ratio}x</td>
