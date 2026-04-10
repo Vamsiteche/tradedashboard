@@ -64,9 +64,9 @@
         </div>
 
         <div class="card" style="border-left: 4px solid var(--accent);">
-            <h3 style="margin-top: 0; color: #fff;">🔑 INDstocks Authorization</h3>
-            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your daily SEBI-compliant token before 9:15 AM IST.</p>
-            <textarea id="apiTokenInput" placeholder="Paste Full Token Here..." autocomplete="off"></textarea>
+            <h3 style="margin-top: 0; color: #fff;">🔑 FlatTrade Authorization</h3>
+            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your FlatTrade Token (Format: UserID|ApiToken) before 9:15 AM IST.</p>
+            <textarea id="apiTokenInput" placeholder="e.g. FT123456|a1b2c3d4e5f6g7h8i9j0..." autocomplete="off"></textarea>
             <div>
                 <button onclick="updateApiToken()">Authorize Bot for Today</button>
                 <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
