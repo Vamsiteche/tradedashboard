@@ -9,7 +9,11 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; max-width: 1000px; margin: auto; }
         h2 { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; color: #fff; }
         .card { background-color: var(--card); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        textarea { width: calc(100% - 24px); padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: white; font-family: monospace; resize: vertical; min-height: 60px;}
+        
+        /* Updated Input Styles */
+        .form-control { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: white; font-family: monospace; box-sizing: border-box; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        
         button { background-color: var(--accent); color: #0d1117; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover { filter: brightness(1.1); }
         .btn-outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); margin-right: 5px; margin-bottom: 10px;}
@@ -65,8 +69,14 @@
 
         <div class="card" style="border-left: 4px solid var(--accent);">
             <h3 style="margin-top: 0; color: #fff;">🔑 FlatTrade Authorization</h3>
-            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Paste your FlatTrade Token (Format: UserID|ApiToken) before 9:15 AM IST.</p>
-            <textarea id="apiTokenInput" placeholder="e.g. FT123456|a1b2c3d4e5f6g7h8i9j0..." autocomplete="off"></textarea>
+            <p style="font-size: 14px; color: #8b949e; margin-top: -5px;">Enter your User ID and API Token generated today before 9:15 AM IST.</p>
+            
+            <!-- 🚨 TWO SEPARATE FIELDS NOW -->
+            <div class="input-group">
+                <input type="text" id="apiUserIdInput" class="form-control" placeholder="User ID (e.g. FT123456)" style="flex: 1;">
+                <input type="password" id="apiTokenInput" class="form-control" placeholder="API Token (e.g. a1b2c3d4e5f6g7h8i9j0...)" style="flex: 3;">
+            </div>
+            
             <div>
                 <button onclick="updateApiToken()">Authorize Bot for Today</button>
                 <span id="tokenStatus" style="margin-left: 15px; font-size: 14px; color: var(--green); display: none;">✅ Securely Synced to Server</span>
@@ -237,10 +247,13 @@
             db.ref('settings/api_token').on('value', (snapshot) => {
                 const data = snapshot.val();
                 const vDiv = document.getElementById('dbTokenVerification');
-                if (data && data.token) {
-                    const t = data.token.trim();
-                    const masked = t.length > 10 ? (t.substring(0, 8) + "......" + t.substring(t.length - 8)) : t;
-                    vDiv.innerHTML = `Active DB Token: [ ${masked} ]<br>Saved at: ${data.timestamp || 'Unknown Time'}`;
+                if (data && data.api_token && data.user_id) {
+                    const t = data.api_token.trim();
+                    const masked = t.length > 10 ? (t.substring(0, 4) + "......" + t.substring(t.length - 4)) : t;
+                    vDiv.innerHTML = `Active User: [ ${data.user_id} ] | Token: [ ${masked} ]<br>Saved at: ${data.timestamp || 'Unknown Time'}`;
+                } else if (data && data.token) {
+                    // Fallback for old single string formats
+                    vDiv.innerHTML = `Active DB Token Synced.<br>Saved at: ${data.timestamp || 'Unknown Time'}`;
                 } else {
                     vDiv.innerHTML = "No active token found in Firebase.";
                 }
@@ -279,15 +292,26 @@
         }
 
         function updateApiToken() {
+            const userId = document.getElementById('apiUserIdInput').value.trim();
             const tokenValue = document.getElementById('apiTokenInput').value.trim();
-            if (!tokenValue) { alert("Please paste a token first."); return; }
+            
+            if (!userId || !tokenValue) { 
+                alert("Please enter both User ID and API Token."); 
+                return; 
+            }
+
+            // We combine them here so the Python files require ZERO changes to keep working!
+            const combinedToken = userId + '|' + tokenValue;
 
             db.ref('settings/api_token').set({
-                token: tokenValue,
+                user_id: userId,
+                api_token: tokenValue,
+                token: combinedToken, // Keeps backward compatibility with Python bot
                 timestamp: new Date().toLocaleString()
             }).then(() => {
                 const status = document.getElementById('tokenStatus');
                 status.style.display = 'inline';
+                document.getElementById('apiUserIdInput').value = ''; 
                 document.getElementById('apiTokenInput').value = ''; 
                 setTimeout(() => status.style.display = 'none', 4000);
             }).catch(error => alert("Error saving token: " + error));
